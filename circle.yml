@@ -70,7 +70,7 @@ defaults:
 
   save-aleth-cache: &save-aleth-cache
     save_cache:
-      key: &aleth-cache-key aleth-prebuilt-cache-{{arch}}-{{checksum "toolchain"}}-v1.8.0
+      key: &aleth-cache-key aleth-prebuilt-cache-{{arch}}-{{checksum "toolchain"}}-v1.6.0
       paths:
         - ~/build
         - ~/.hunter
@@ -84,7 +84,7 @@ defaults:
       name: "Checkout aleth repo"
       working_directory: ~/
       command: |
-        git clone https://github.com/ethereum/aleth --branch v1.8.0 --single-branch --recurse-submodules --depth 1
+        git clone https://github.com/ethereum/aleth --branch v1.6.0 --single-branch --recurse-submodules --depth 1
 
   link-hera: &link-hera
     run:
@@ -119,7 +119,7 @@ defaults:
     run:
       name: "Install aleth"
       command: |
-        VER=1.8.0
+        VER=1.6.0
         OS=$(uname | tr '[:upper:]' '[:lower:]')
         URL=https://github.com/ethereum/aleth/releases/download/v$VER/aleth-$VER-$OS-x86_64.tar.gz
         echo $URL
@@ -184,7 +184,6 @@ defaults:
     run:
       name: "Upload coverage data"
       command: |
-        sudo pip3 install --upgrade --quiet --no-cache-dir codecov
         codecov --required --gcov-root ~/build --gcov-exec gcov-8
 
 
@@ -197,7 +196,7 @@ jobs:
       CC:  clang
       GENERATOR: Ninja
       BUILD_PARALLEL_JOBS: 4
-      CMAKE_OPTIONS: -DBUILD_SHARED_LIBS=ON -DHERA_DEBUGGING=OFF -DHERA_BINARYEN=ON -DHERA_WAVM=ON -DHERA_WABT=ON
+      CMAKE_OPTIONS: -DBUILD_SHARED_LIBS=ON -DHERA_DEBUGGING=OFF -DHERA_BINARYEN=ON -DHERA_WAVM=ON -DHERA_WABT=ON -DEVMC_TEST_TOOLS=ON
     docker:
       - image: ethereum/cpp-build-env:9
     steps:
@@ -212,11 +211,11 @@ jobs:
       - *install-aleth
       - *add-package-to-workspace
       - *fetch-tests
-#      - *test-binaryen
-#      - *test-wabt
-#      - *test-wavm
-#      - *evmc-test
-#      - *evm2wasm-test
+      - *test-binaryen
+      - *test-wabt
+      - *test-wavm
+      - *evmc-test
+      - *evm2wasm-test
 
   linux-clang-shared-asan:
     environment:
@@ -225,7 +224,7 @@ jobs:
       CC:  clang
       GENERATOR: Ninja
       BUILD_PARALLEL_JOBS: 4
-      CMAKE_OPTIONS: -DBUILD_SHARED_LIBS=ON -DHERA_DEBUGGING=OFF -DHERA_BINARYEN=ON -DHERA_WAVM=ON -DHERA_WABT=ON -DSANITIZE=address
+      CMAKE_OPTIONS: -DBUILD_SHARED_LIBS=ON -DHERA_DEBUGGING=OFF -DHERA_BINARYEN=ON -DHERA_WAVM=ON -DHERA_WABT=ON -DEVMC_TEST_TOOLS=ON -DSANITIZE=address
       # The ASan must the first loaded shared library. Force preloading it with this flag.
       PRELOAD_ASAN: true
     docker:
@@ -241,20 +240,20 @@ jobs:
       - *save-deps-cache
       - *install-aleth
       - *fetch-tests
-#      - *test-binaryen
-#      - *test-wabt
-#      - *test-wavm
-#      - *evmc-test
-#      - *evm2wasm-test
+      - *test-binaryen
+      - *test-wabt
+      - *test-wavm
+      - *evmc-test
+      - *evm2wasm-test
 
   linux-gcc-shared-coverage:
     environment:
-      - BUILD_TYPE: Coverage
+      - BUILD_TYPE: Debug
       - CXX: g++
       - CC:  gcc
       - GENERATOR: Unix Makefiles
       - BUILD_PARALLEL_JOBS: 4
-      - CMAKE_OPTIONS: -DBUILD_SHARED_LIBS=ON -DHERA_DEBUGGING=ON -DHERA_BINARYEN=ON -DHERA_WABT=ON -DHERA_WAVM=ON
+      - CMAKE_OPTIONS: -DCOVERAGE=ON -DBUILD_SHARED_LIBS=ON -DHERA_DEBUGGING=ON -DHERA_BINARYEN=ON -DHERA_WABT=ON -DHERA_WAVM=ON
       - TESTETH_OPTIONS: --evmc benchmark=true
     docker:
       - image: ethereum/cpp-build-env:9
@@ -269,9 +268,9 @@ jobs:
       - *save-deps-cache
       - *install-aleth
       - *fetch-tests
-#      - *test-binaryen
-#      - *test-wabt
-#      - *test-wavm
+      - *test-binaryen
+      - *test-wabt
+      - *test-wavm
       - *upload-coverage-data
 
   linux-gcc-static-debug:
@@ -302,7 +301,7 @@ jobs:
       - BUILD_PARALLEL_JOBS: 4
       - CMAKE_OPTIONS: -DHERA_DEBUGGING=ON -DHERA_BINARYEN=ON -DHERA_WABT=ON
     macos:
-      xcode: "11.7.0"
+      xcode: "10.1.0"
     steps:
       - run:
           name: "Install system dependencies"
@@ -319,8 +318,8 @@ jobs:
       - *add-package-to-workspace
       - *install-aleth
       - *fetch-tests
-#      - *test-binaryen
-#      - *test-wabt
+      - *test-binaryen
+      - *test-wabt
 
   lint:
     docker:
@@ -328,16 +327,6 @@ jobs:
     steps:
       - checkout
       - *codespell
-
-  test_ghr:
-    docker:
-      - image: circleci/golang
-    steps:
-      - run:
-          name: "Install ghr"
-          command: |
-            go install github.com/tcnksm/ghr@v0.13.0
-            ghr --version
 
   # The job collects built packages (available in the workspace) and
   # uploads them to the GitHub release matching the git tag.
@@ -348,7 +337,8 @@ jobs:
       - run:
           name: "Install ghr"
           command: |
-            go install github.com/tcnksm/ghr@v0.13.0
+            go get -u github.com/kardianos/govendor
+            govendor get github.com/tcnksm/ghr@=v0.12.0
       - attach_workspace:
           at: ~/package
       - run:
@@ -364,7 +354,6 @@ workflows:
   version: 2
   hera:
     jobs:
-      - test_ghr
       - lint
       - linux-clang-shared-asan
       - linux-gcc-shared-coverage
