@@ -5,24 +5,23 @@ if(NOT EXISTS ${CMAKE_SOURCE_DIR}/evmc/.git OR NOT EXISTS ${CMAKE_SOURCE_DIR}/cm
 endif()
 
 include(cmake/cable/bootstrap.cmake)
+include(CableBuildInfo)
 include(CableBuildType)
 include(CableCompilerSettings)
 include(CableToolchains)
 include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
 
 include(Hunter/init)
 
 cable_configure_toolchain(DEFAULT cxx17-pic)
 
-cable_set_build_type(DEFAULT RelWithDebInfo CONFIGURATION_TYPES Debug;Release;RelWithDebInfo)
-
 set(CMAKE_DEBUG_POSTFIX "")
 
 project(hera)
-set(PROJECT_VERSION 0.6.0)
+set(PROJECT_VERSION 0.2.5-alpha.0)
 
-include(CableBuildInfo)
-include(GNUInstallDirs)
+cable_set_build_type(DEFAULT RelWithDebInfo CONFIGURATION_TYPES Debug;Release;RelWithDebInfo)
 
 cable_configure_compiler()
 if(CABLE_COMPILER_GNULIKE)
